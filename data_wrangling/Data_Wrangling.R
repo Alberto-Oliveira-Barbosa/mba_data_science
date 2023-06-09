@@ -9,6 +9,8 @@ library("tidyverse")
 dados <- read.csv2('../dados/test.csv',header = TRUE,sep = ',')
 
 
+setwd("~/projetos/mba_data_science/data_wrangling")
+
 #--------------------Visualização-----------------------------------------------
 
 # Algumas formas para visualizar informações do dataset
@@ -601,3 +603,160 @@ semi_join(dataset_inicial, dataset_merge,
 anti_join(dataset_inicial, dataset_merge,
           by = "ID_PASSAGEIRO")
 
+
+#--------------------Bind-------------------------------------------------------
+
+# Existem formas simples de combinar datasets, adequados em casos particulares
+# As funções "bind" combinam datasets sem a especificação de uma "chave"
+# Isto significa que as observações ou variáveis devem estar na mesma ordem
+
+# Vamos criar alguns datasets para exemplificar:
+
+dataset_bind_1 <- tibble(var1 = c("obs1", "obs2", "obs3", "obs4"),
+                         var2 = sample(1:100, 4, replace=TRUE),
+                         var3 = sample(1:100, 4, replace=TRUE))
+
+dataset_bind_2 <- tibble(var4 = c("obs1", "obs2", "obs3", "obs4"),
+                         var5 = sample(1:100, 4, replace=TRUE))
+
+dataset_bind_3 <- tibble(var6 = c("obs50", "obs51", "obs52", "obs53"),
+                         var7 = sample(1:100, 4, replace=TRUE))
+
+dataset_bind_4 <- tibble(var1 = c("obs5", "obs6", "obs7", "obs8", "obs9"),
+                         var2 = sample(1:100, 5, replace=TRUE),
+                         var3 = sample(1:100, 5, replace=TRUE))
+
+# Combinar colunas (variáveis): deve haver o mesmo número de observações
+# junta as novas colunas a direita dos dados, a quantidade de linhas 
+# deve ser igual para os dois dataframes
+
+bind_cols(dataset_bind_1, dataset_bind_2)
+
+# Combinar linhas (observações): as variáveis devem estar na ordem
+# junta os dois dataframes colocando o segundo abaixo do primeiro
+# para esse caso a quantidade de colunas (variávies) devem ser iguais
+
+bind_rows(dataset_bind_1, dataset_bind_4)
+
+#--------------------Iterações com Purrr----------------------------------------
+
+# O pacote purrr oferece funções que realizam iterações mais facilmente
+
+# https://purrr.tidyverse.org/
+
+# As iterações evitam a repetição de códigos
+# São adequadas quando a intenção é realizar a mesma tarefa em vários inputs
+# Por exemplo, evitam repetir o código que seria aplicado em diversas variáveis 
+
+# No purrr, as funções map() realizam tais tarefas
+# O map() parte de um vetor e aplica dada função para cada elemento dele
+# Retorna um vetor de mesmo comprimento do vetor input. Vetores resultantes:
+
+# map(): listas
+# map_lgl(): lógicos
+# map_int(): inteiros
+# map_dbl(): doubles
+# map_chr(): caracteres 
+
+# A seguir, vamos criar o vetor que contém os inputs para a função map()
+# Para o dataset_inicial, vamos selecionar as variáveis numéricas:
+glimpse(dataset_inicial)
+
+vetor_input <- c("IDADE", "TARIFA")
+
+# O objetivo é criar um vetor (numérico) que contém estatísticas por variável
+
+# A seguir, cada linha gera um tipo de estatística para cada variável do vetor
+# A tarefa que realizamos em 3 linhas antes, é realizada em uma linha agora
+
+map_dbl(dataset_inicial[vetor_input], mean, na.rm = T)
+map_dbl(dataset_inicial[vetor_input], median, na.rm = T)
+map_dbl(dataset_inicial[vetor_input], sd, na.rm = T)
+map(dataset_inicial[vetor_input], quantile, probs = c(0.25, 0.50, 0.75), na.rm = T)
+
+# ATENÇÃO: embora não seja necessário nesta base de dados, usamos na.rm = T
+# O argumento solicita a remoção de NAs antes de fazer as contas (T é TRUE)
+# É um argumento importante, pois evita erros quando há dados faltantes
+
+# Nos caso os percentis, utilizamos apenas o map, pois é gerada uma lista
+# A justificativa é que pedimos 2 informações no mesmo código
+# Vamos analisar o objeto gerado em uma lista
+
+lista_quartis <- map(dataset_inicial[vetor_input], quantile, probs = c(0.25, 0.50, 0.75), na.rm = T)
+
+lista_quartis[["IDADE"]]
+lista_quartis[["IDADE"]][["25%"]]
+
+# A seguir, vamos utilizar o map() e gerar descritivas completas das variáveis
+
+map(dataset_inicial[vetor_input], ~ summary(.))
+
+# Portanto, o cógigo acima gerou mais informação em uma única linha
+# O ~ indica que trata-se de uma função, ou seja, escreveremos uma função
+# Os pontos substituem a indicação dos dados (usa nova_base[vetor_input])
+
+# Acima, foram utilizadas funções já existentes (mean, median, sd, quantile)
+# Porém, também poderiam conter funções (functions) criadas por nós
+# A seguir, combinaremos o map() como a função do coeficiente de variação
+
+coef_var <- function(x) {
+  cv <- ((sd(x, na.rm=T))/(mean(x, na.rm=T)))*100
+  return(cv)
+}
+
+# Após elaborar a nova função, basta utilizá-la no map()
+
+map_dbl(dataset_inicial[vetor_input], coef_var)
+
+# Também poderíamos adicionar diretamente ao map() com os atalhos ~ e .
+# onde o ~ significa uma função 
+# e o . são os argumentos passados para ela
+
+map_dbl(dataset_inicial[vetor_input], ~ (sd(., na.rm=T) / mean(., na.rm=T))*100)
+
+# A seguir, utilizamos o map pedindo os elementos da 5ª linha
+
+map(dataset_inicial, 5)
+
+# Também podemos identificar os tipos de elementos contidos no vetor
+
+map_chr(dataset_inicial, typeof)
+
+# E os elementos únicos deste objeto
+
+map(dataset_inicial, unique)
+
+# Em resumo, podemos utilizar a função map() de forma bastante flexível
+# A ideia é sempre replicar uma função aos elementos do vetor input
+
+#------------------------MAP2---------------------------------------------------
+
+# O map() também pode ser aplicado quando há múltiplos inputs
+
+# Por exemplo, vamos gerar variáveis com as seguintes médias e desvios padrão
+
+médias_var <- list(5, 10, 15)
+desv_pad_var <- list(1, 2, 3)
+
+map2(médias_var, desv_pad_var, rnorm, n = 5)
+
+# Os parâmetros interagiram em sequencia: 5 e 1, 10 e 2, 15 e 3
+# No map2(), os inputs que variam estão antes da função e os dados fixos depois
+
+
+#---------------------PMAP------------------------------------------------------
+
+# Para vários inputs, utiliza-se pmap()
+# Vamos variar o tamanho "n" das variáveis
+
+tamanho_var <- list(7, 9, 11)
+
+parametros <- list(tamanho_var, médias_var, desv_pad_var) # sequência da fórmula
+
+pmap(parametros, rnorm)
+
+# Na prática, para evitar erros, é melhor nomear os argumentos
+
+parametros2 <- list(mean = médias_var, sd = desv_pad_var, n = tamanho_var)
+
+pmap(parametros2, rnorm)
