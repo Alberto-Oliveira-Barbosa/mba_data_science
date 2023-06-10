@@ -3,13 +3,13 @@ install.packages("readxl")
 install.packages("knitr")
 
 library("tidyverse")
+library(readxl)
+# define o diretório de trabalho para reconhcecer mais facilmente os caminhos dos arquivos
+setwd("~/projetos/mba_data_science/data_wrangling")
 
 # como o objetivo é para estudo, foi utilizado o dataset do Titanic
 # https://www.kaggle.com/competitions/titanic/data
 dados <- read.csv2('../dados/test.csv',header = TRUE,sep = ',')
-
-
-setwd("~/projetos/mba_data_science/data_wrangling")
 
 #--------------------Visualização-----------------------------------------------
 
@@ -627,7 +627,7 @@ dataset_bind_4 <- tibble(var1 = c("obs5", "obs6", "obs7", "obs8", "obs9"),
                          var3 = sample(1:100, 5, replace=TRUE))
 
 # Combinar colunas (variáveis): deve haver o mesmo número de observações
-# junta as novas colunas a direita dos dados, a quantidade de linhas 
+# junta as novas colunas a direita dos dados, a quantidade de linhas
 # deve ser igual para os dois dataframes
 
 bind_cols(dataset_bind_1, dataset_bind_2)
@@ -760,3 +760,106 @@ pmap(parametros, rnorm)
 parametros2 <- list(mean = médias_var, sd = desv_pad_var, n = tamanho_var)
 
 pmap(parametros2, rnorm)
+
+
+#-----------------------UNIQUE-------------------------------------------------
+
+# Com a função unique podemos ver os valores únicos dos dados
+
+unique(dados$Embarked)
+
+glimpse(dados)
+ 
+#---------------------na_if------------------------------------------------------
+# com ela podemos substituir algo nos dados por NA
+
+dados %>% mutate(
+  Cabin = na_if(Cabin, "")
+) %>% select(Cabin)
+
+# caso seja usado umafunção de conversão numérica os valores que não podem ser convertidos
+# para números são transformados em NA
+
+dados %>% mutate(
+  Cabin = as.double(Age)
+) %>% 
+select(Cabin) %>% 
+slice_tail(n=10)
+
+
+#-----------------------PIVOT-------------------------------------------------
+# Para fazer o pivot de um dataframe é usado a função pivot_wider
+
+
+head(fish_encounters)
+
+fish_encounters %>%
+  pivot_wider(
+    names_from = station, 
+    values_from = seen)
+# Fill in missing values
+fish_encounters %>%
+  pivot_wider(names_from = station, values_from = seen, values_fill = 0)
+
+# Generate column names from multiple variables
+head(us_rent_income)
+us_rent_income %>%
+  pivot_wider(
+    names_from = variable,
+    values_from = c(estimate, moe)
+  )
+
+df_wdi <- read_excel("../dados/wdi_world_bank.xlsx")
+
+df_wdi <- df_wdi[1:383572,]
+
+df_wdi <- df_wdi %>% rename(
+  pais = 1,
+  cod_pais = 2,
+  serie = 3,
+  cod_serie = 4,
+  ano_2021 = 5,
+  topico = 6) %>% mutate(
+    ano_2021 = as.double(ano_2021)
+  ) %>% filter(
+    str_detect(topico, "^Economic Policy & Debt")
+  )
+
+
+df_pivot <- df_wdi %>% pivot_wider(
+  id_cols = c("pais", "cod_pais"), # linhas
+  names_from = "serie", # colunas 
+  values_from = "ano_2021") # valor das linhas
+
+print("linhas e colunas")
+dim(df_pivot)
+
+# é possível remover as colunas que tiverem todos os seus valores NA
+df_pivot <- df_pivot %>%
+  purrr::discard(~ all(is.na(.)))
+
+print("linhas e colunas")
+dim(df_pivot)
+
+glimpse(df_pivot)
+ 
+#------------------------VALORES INFINITOS-------------------------------------
+# O R pode criar valores considerados infinitos(inf) 
+# para encontrar valores infinitos usar a função is.infinite(coluna)
+
+# gerar um df com valores infinitos para exemplo
+df_inf = fish_encounters %>% mutate(
+  col_infinito = sample(0:1, dim(fish_encounters)[1], replace=TRUE),
+  infinito = seen / col_infinito, # gera valores aleatórios infinitos por causa
+  # divisão por 0
+  infinito = is.infinite(infinito) # Atribui True para infinitos
+) %>% select(-col_infinito)
+
+
+head(df_inf)
+
+# com isso podemos usar a condição para filtrar
+
+df_inf %>% filter(
+  infinito == TRUE
+)
